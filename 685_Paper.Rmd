@@ -1,0 +1,252 @@
+---
+title: "685_Paper"
+author: "Robert Schultz"
+date: "11/25/2020"
+output: word_document
+---
+```{r}
+suppressPackageStartupMessages({
+    library(ggplot2)
+    library(dplyr)
+    library(magrittr)
+    library(scales)
+})
+```
+#Strip Data 
+```{r}
+Behavior_2003.1 = select(da34085.0001, NUMADULT, PHYSHLTH, AVEDRNK, CHILDREN, WEIGHT, SEX, IMPAGE, MODPAMN)
+```
+```{r}
+Behavior_2003 = select(Behavior_2003, NUMADULT, Poor_Health_Days, Average_Drink, Children, Weight, SEX, Age, Exercise_Minutes)
+```
+
+#Recode variables
+```{r}
+Behavior_2003 <- Behavior_2003 %>% mutate(AVEDRNK = replace(AVEDRNK, AVEDRNK == "77",NA))
+Behavior_2003 <- Behavior_2003 %>% mutate(AVEDRNK = replace(AVEDRNK, AVEDRNK == "99",NA))
+Behavior_2003 <- Behavior_2003 %>% mutate(CHILDREN = replace(CHILDREN, CHILDREN == "88",NA))
+Behavior_2003 <- Behavior_2003 %>% mutate(PHYSHLTH = replace(PHYSHLTH, PHYSHLTH == "88",NA))
+Behavior_2003 <- Behavior_2003 %>% mutate(PHYSHLTH = replace(PHYSHLTH, PHYSHLTH == "77",NA))
+Behavior_2003 <- Behavior_2003 %>% mutate(PHYSHLTH = replace(PHYSHLTH, PHYSHLTH == "99",NA))
+Behavior_2003 <- Behavior_2003 %>% mutate(CHILDREN = replace(CHILDREN, CHILDREN == "99",NA))
+Behavior_2003 <- Behavior_2003 %>% mutate(CHILDREN = replace(CHILDREN, CHILDREN == "88",NA))
+Behavior_2003 <- Behavior_2003 %>% mutate(EDUCA = replace(EDUCA, EDUCA == "9",NA))
+Behavior_2003 <- Behavior_2003 %>% mutate(WEIGHT = replace(WEIGHT, WEIGHT == "999",NA))
+Behavior_2003 <- Behavior_2003 %>% mutate(WEIGHT = replace(WEIGHT, WEIGHT == "777",NA))
+Behavior_2003 <- Behavior_2003 %>% mutate(MODPADAY = replace(MODPADAY, MODPADAY == "99",NA))
+Behavior_2003 <- Behavior_2003 %>% mutate(MODPADAY = replace(MODPADAY, MODPADAY == "77",NA))
+Behavior_2003 <- Behavior_2003 %>% mutate(MODPADAY = replace(MODPADAY, MODPADAY == "88",NA))
+
+```
+#Rename Variables
+```{r}
+Behavior_2003 <- Behavior_2003 %>% dplyr::rename('Average_Drink' = AVEDRNK)
+Behavior_2003 <- Behavior_2003 %>% dplyr::rename('Children' = CHILDREN)
+Behavior_2003 <- Behavior_2003 %>% dplyr::rename('Poor_Health_Days' = PHYSHLTH)
+Behavior_2003 <- Behavior_2003 %>% dplyr::rename('Education' = EDUCA)
+Behavior_2003 <- Behavior_2003 %>% dplyr::rename('Weight' = WEIGHT)
+Behavior_2003 <- Behavior_2003 %>% dplyr::rename('Moderate_Weekly' = MODPADAY)
+Behavior_2003 <- Behavior_2003 %>% dplyr::rename('Age' = IMPAGE)
+Behavior_2003 <- Behavior_2003 %>% dplyr::rename('Exercise_Minutes'= MODPAMN)
+```
+```{r}
+newdata <- na.omit(Behavior_2003)
+```
+
+#Summary Statistics 
+```{r}
+summary(newdata)
+```
+#Summary Table by Gender
+```{r}
+library(gtsummary)
+
+newdata %>% 
+  tbl_summary(by = SEX) %>% 
+  add_stat_label() %>%
+  as_gt() %>%
+  gt::tab_header("Table 1:Full Summary Statitics by Gender") %>%
+  gt::tab_options(
+    table.font.size = "small",
+    data_row.padding = gt::px(1)
+  )
+```
+
+```{r}
+Behavior03 <- data.frame(newdata)
+columns <- colnames(Behavior03)
+
+t1 <- stargazer(
+  Behavior03[,columns], type = "text",
+  summary.stat = c("min", "p25", "p75", "max", "mean", "median", "sd"),
+  title = "Table 1 - Summary Stats",
+  align=TRUE
+)
+```
+
+```{r}
+lm1 <- lm(Average_Drink ~ NUMADULT + Poor_Health_Days + Children + Weight + SEX + Age + Exercise_Minutes, data = Behavior03)
+lm2 <- lm(Average_Drink ~ Weight + Age + SEX, data = Behavior03)
+
+library(stargazer)
+stargazer(lm1,lm2, type = "text")
+
+```
+```{r}
+ggplot(Behavior03, aes(y=Average_Drink)) + 
+    geom_boxplot() +
+    facet_wrap(~SEX, scale="free")
+```
+
+```{r}
+anova(lm1, lm2)
+print(anova())
+```
+
+```{r}
+A <-ggplot(Behavior03, aes(x = Age, y = Average_Drink))
+A + geom_jitter() +
+  ylim(1,25) +
+  xlim(15, 90) +
+  geom_smooth(method = "lm")
+```
+```{r}
+par(mfrow=c(2,2))
+plot(lm1)
+```
+```{r}
+par(mfrow=c(2,2))
+plot(lm2)
+```
+
+
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+for (package in c("dplyr", "faraway", "ggplot2", "gridExtra", "leaps", "lmtest", "MASS",  "mgcv", "tidyverse", "readr", "sandwich")) {
+    if (!require(package, character.only=T, quietly=T)) {
+        install.packages(package, repos="http://cran.us.r-project.org")
+        library(package, character.only=T)
+    }
+}
+```
+#Stepwise
+```{r}
+sub <-regsubsets(Average_Drink ~ NUMADULT + Poor_Health_Days + Average_Drink + Children + Weight + SEX + Age + Exercise_Minutes, data = Behavior03)
+rsub<-summary(sub) 
+rsub$which
+```
+
+```{r}
+aic<-dim(Behavior03)[1]*log(rsub$rss/dim(Behavior03)[1])+ 
+(1:7)*2
+plot(aic~I(1:7), ylab="AIC", xlab="# Predictors")
+```
+
+```{r}
+plot(rsub$adjr2~I(1:7), ylab="Adjusted R-Squared", xlab="# Predictors") 
+```
+```{r}
+plot(rsub$cp~I(1:7), ylab="Cp", xlab="# Predictors") 
+```
+```{r}
+lm3 <-lm(Average_Drink ~ NUMADULT + Poor_Health_Days + Weight + SEX + Age + Exercise_Minutes, data = Behavior03)
+
+stargazer(lm3,type = "text")
+```
+```{r}
+summ(lm1)
+```
+
+```{r}
+library(tidyverse)
+library(caret)
+
+install.packages("car")
+library(car)
+
+vif(lm3)
+
+vif_values <- vif(lm3)
+barplot(vif_values, vif = 5, main = "VIF Values", horiz = TRUE, col = "red")
+abline(v = 3, lwd = 3, lty = 1)
+
+install.packages("mctest")
+library(mctest)
+
+vif(lm3, plot=TRUE)
+```
+```{r}
+vif(lm3, plot=TRUE)
+plot(vif(lm3))
+```
+
+```{r}
+par(mfrow=c(2,2))
+plot(lm3)
+```
+```{r}
+confint(lm3)
+```
+```{r}
+qqnorm(rstandard(lm3))
+```
+```{r}
+new.df <-Behavior03(NUMADULT=c(2), Poor_Health_Days=c(2), Weight=c(165), Age=c(26), Exercise_Minutes=c(30))
+predict(model, new.df)
+
+
+```
+
+```{r}
+ggplot(aes(x=Weight,y=Exercise_Minutes),data=Behavior03)+
+  geom_jitter()+
+  ylim(1,100) +
+  xlim(1,400) +
+  facet_grid(~SEX)+
+  geom_smooth(method="lm", colour="green", size=0.5)
+
+SexW <- lm(Average_Drink ~ Weight*Exercise_Minutes, Behavior03)
+summary(SexW)
+```
+
+```{r}
+library(jtools)
+fiti <- lm(Average_Drink ~NUMADULT + Poor_Health_Days + Exercise_Minutes + Age + Weight*SEX, data = Behavior03)
+summary(fiti)
+```
+
+```{r}
+#Plot it up!
+WeightEx<-ggplot(data=Behavior03, aes(x=Weight, y=Exercise_Minutes, group=SEX))+
+      coord_cartesian(ylim = c(0,125))+  
+#For ylim, specify the range of your DV (in our case, 0-4)
+      geom_jitter(size=2, aes(color=SEX))+
+      ylab("Exercise Minutes")+
+      xlab("Weight")+
+      ggtitle("Weight and Exercise Minutes")+
+      theme_classic()+ 
+        theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank())+
+      scale_fill_grey() + 
+  geom_smooth(method="lm", colour="blue", size=0.25)
+plot(WeightEx)
+```
+```{r}
+set.seed(123)
+train.control2 <- trainControl(method ="cv", number = 5)
+step.model <- train(Average_Drink ~ NUMADULT + Poor_Health_Days + Weight + SEX + Age + Exercise_Minutes, data = Behavior03,
+                    method = "lmStepAIC",
+                    trControl = train.control2,
+                    trace = FALSE)
+step.model$results
+step.model$finalModel
+summ(step.model$finalModel)
+```
+
+
+
+
+
+
